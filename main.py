@@ -1,4 +1,3 @@
-import sys
 from math_utils import multiply, is_even
 
 
