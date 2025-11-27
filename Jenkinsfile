@@ -86,7 +86,7 @@ pipeline {
             echo 'Cleaning up workspace...'
             // Remove the virtual env and the docker image to save space
             sh "rm -rf ${VENV_NAME}"
-            // sh "docker rmi ${IMAGE_NAME}:latest || true"
+            sh "docker rmi ${IMAGE_NAME}:latest || true"
         }
         success {
             echo 'Pipeline completed successfully!'
