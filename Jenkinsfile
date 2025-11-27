@@ -36,11 +36,15 @@ pipeline {
                     set -e
                     . venv/bin/activate
 
+                    # Run black only on your project (optional: adjust paths)
                     black --check .
-                    flake8 .
+
+                    # Run flake8 but ignore venv and common junk dirs
+                    flake8 . --exclude=venv,.venv,.git,__pycache__
                 '''
             }
         }
+
 
         stage('Build') {
             steps {
