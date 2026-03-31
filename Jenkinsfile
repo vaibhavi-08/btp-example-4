@@ -98,22 +98,18 @@ pipeline {
                     usernameVariable: 'SSH_USER'
                 )]) {
                     sh """
-                        ssh -i \$SSH_KEY \
-                            -o StrictHostKeyChecking=no \
-                            \$SSH_USER@${env.DEPLOY_HOST} \
-                            '
-                            docker pull ${env.DOCKER_IMAGE}:${env.IMAGE_TAG} &&
-                            docker stop ${env.CONTAINER_NAME} || true &&
-                            docker rm   ${env.CONTAINER_NAME} || true &&
-                            docker run -d \
-                                --name ${env.CONTAINER_NAME} \
-                                --restart unless-stopped \
-                                ${env.DOCKER_IMAGE}:${env.IMAGE_TAG}
-                            '
+                    ssh -i \$SSH_KEY -o StrictHostKeyChecking=no \$SSH_USER@${env.DEPLOY_HOST} << 'EOF'
+                    docker pull ${env.DOCKER_IMAGE}:${env.IMAGE_TAG}
+                    docker stop ${env.CONTAINER_NAME} || true
+                    docker rm ${env.CONTAINER_NAME} || true
+                    docker run -d \\
+                    --name ${env.CONTAINER_NAME} \\
+                    --restart unless-stopped \\
+                    ${env.DOCKER_IMAGE}:${env.IMAGE_TAG}
+                    EOF
                     """
                 }
             }
-            // cleanup runs after deploy steps finish, whether they pass or fail
             post {
                 always {
                     script {
