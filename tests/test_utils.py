@@ -1,11 +1,17 @@
+import unittest
 from math_utils import multiply, is_even
 
 
-def test_multiply():
-    assert multiply(3, 4) == 12
-    assert multiply(0, 10) == 0
+class TestMathUtils(unittest.TestCase):
+
+    def test_multiply(self):
+        self.assertEqual(multiply(3, 4), 12)
+        self.assertEqual(multiply(0, 10), 0)
+
+    def test_is_even(self):
+        self.assertTrue(is_even(2))
+        self.assertFalse(is_even(3))
 
 
-def test_is_even():
-    assert is_even(2) is True
-    assert is_even(3) is False
+if __name__ == '__main__':
+    unittest.main()

@@ -66,7 +66,10 @@ pipeline {
 
         stage('Push') {
             when {
-                branch "${env.DEPLOY_BRANCH}"
+                expression {
+                    return env.GIT_BRANCH == "origin/${env.DEPLOY_BRANCH}" ||
+                        env.GIT_BRANCH == env.DEPLOY_BRANCH
+                }
             }
             steps {
                 script {
@@ -83,7 +86,10 @@ pipeline {
 
         stage('Deploy') {
             when {
-                branch "${env.DEPLOY_BRANCH}"
+                expression {
+                    return env.GIT_BRANCH == "origin/${env.DEPLOY_BRANCH}" ||
+                        env.GIT_BRANCH == env.DEPLOY_BRANCH
+                }
             }
             steps {
                 withCredentials([sshUserPrivateKey(
