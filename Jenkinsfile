@@ -64,7 +64,7 @@ pipeline {
             }
         }
 
-        stage('Push') {
+        stage('Deploy') {
             when {
                 expression {
                     return env.GIT_BRANCH == "origin/${env.DEPLOY_BRANCH}" ||
@@ -81,26 +81,14 @@ pipeline {
                         dockerImage.push('latest')
                     }
                 }
-            }
-        }
-
-        stage('Deploy') {
-            when {
-                expression {
-                    return env.GIT_BRANCH == "origin/${env.DEPLOY_BRANCH}" ||
-                        env.GIT_BRANCH == env.DEPLOY_BRANCH
-                }
-            }
-            steps {
                 withCredentials([sshUserPrivateKey(
                     credentialsId: env.DEPLOY_SSH_CREDS,
                     keyFileVariable: 'SSH_KEY',
                     usernameVariable: 'SSH_USER'
                 )]) {
                     sh """
-    echo "IMAGE=${env.DOCKER_IMAGE} TAG=${env.IMAGE_TAG} CONTAINER=${env.CONTAINER_NAME} HOST=${env.DEPLOY_HOST}"
-    ssh -i \$SSH_KEY -o StrictHostKeyChecking=no \$SSH_USER@${env.DEPLOY_HOST} 'docker pull ${env.DOCKER_IMAGE}:${env.IMAGE_TAG} ; docker stop ${env.CONTAINER_NAME} || true ; docker rm ${env.CONTAINER_NAME} || true ; docker run -d --name ${env.CONTAINER_NAME} --restart unless-stopped ${env.DOCKER_IMAGE}:${env.IMAGE_TAG}'
-"""
+                        ssh -i \$SSH_KEY -o StrictHostKeyChecking=no \$SSH_USER@${env.DEPLOY_HOST} 'docker pull ${env.DOCKER_IMAGE}:${env.IMAGE_TAG} ; docker stop ${env.CONTAINER_NAME} || true ; docker rm ${env.CONTAINER_NAME} || true ; docker run -d --name ${env.CONTAINER_NAME} --restart unless-stopped ${env.DOCKER_IMAGE}:${env.IMAGE_TAG}'
+                    """
                 }
             }
             post {
@@ -111,10 +99,10 @@ pipeline {
                     cleanWs()
                 }
                 success {
-                    echo "App running on ${env.DEPLOY_HOST}"
+                    echo "Container deployed successfully on ${env.DEPLOY_HOST}"
                 }
                 failure {
-                    echo "Pipeline failed at deploy. Check logs above."
+                    echo "Pipeline failed at Push & Deploy. Check logs above."
                 }
             }
         }
