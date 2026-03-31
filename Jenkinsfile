@@ -13,6 +13,8 @@ pipeline {
             steps {
                 checkout scm
                 script {
+                    echo "Branch name: ${env.BRANCH_NAME}"
+                    echo "GIT_BRANCH: ${env.GIT_BRANCH}"
                     def config = readFile('pipeline.config')
                     config.readLines().each { line ->
                         line = line.trim()
@@ -56,7 +58,7 @@ pipeline {
             steps {
                 script {
                     dockerImage.inside {
-                        sh 'python -m unittest discover -v'
+                        sh 'python -m unittest discover -s tests -p "test*.py" -v'
                     }
                 }
             }
