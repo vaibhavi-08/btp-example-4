@@ -1,98 +1,125 @@
 pipeline {
     agent any
 
-    // We disable the default checkout so we can make it an explicit stage as you requested
-    options { 
-        skipDefaultCheckout() 
-    }
-
     environment {
-        IMAGE_NAME = "my-python-app"
-        VENV_NAME = "venv"
+        REGISTRY_CREDS   = 'dockerhub-credentials'
+        DEPLOY_SSH_CREDS = 'deploy-server-ssh'
+        DOCKER_REGISTRY  = 'registry-1.docker.io'
     }
 
     stages {
-        // 1. CHECKOUT: Get the code from Git
+
         stage('Checkout') {
             steps {
-                echo 'Stage 1: Checkout SCM...'
                 checkout scm
+                script {
+                    def config = readFile('pipeline.config')
+                    config.readLines().each { line ->
+                        line = line.trim()
+                        if (line && !line.startsWith('#')) {
+                            def parts = line.split('=', 2)
+                            if (parts.length == 2) {
+                                env[parts[0].trim()] = parts[1].trim()
+                            }
+                        }
+                    }
+                    env.IMAGE_TAG = env.BUILD_NUMBER
+                }
             }
         }
 
-        // 2. SETUP: Create environment and install dependencies
-        stage('Setup') {
-            steps {
-                echo 'Stage 2: Setup Virtual Environment...'
-                // Create venv and install requirements
-                sh """
-                    python3 -m venv ${VENV_NAME}
-                    . ${VENV_NAME}/bin/activate
-                    pip install -r requirements.txt
-                """
-            }
-        }
-
-        // 3. QUALITY: Formatting and Linting (Black & Flake8)
-        stage('Quality') {
-            steps {
-                sh '''
-                    set -e
-                    . venv/bin/activate
-
-                    # Run black only on your project (optional: adjust paths)
-                    black --check .
-
-                    # Run flake8 but ignore venv and common junk dirs
-                    flake8 . --exclude=venv,.venv,.git,__pycache__
-                '''
-            }
-        }
-
-        // 4. BUILD: Build the Docker Image
         stage('Build') {
             steps {
-                echo 'Stage 4: Building Docker Image...'
-                // Build the image tagged as 'latest'
-                sh "docker build -t ${IMAGE_NAME}:latest ."
+                script {
+                    dockerImage = docker.build(
+                        "${env.DOCKER_IMAGE}:${env.IMAGE_TAG}"
+                    )
+                }
             }
         }
 
-        // 5. TEST: Run Unit Tests (Pytest)
+        // flake8 . checks entire repo from root
+        // no pip install — flake8 must be in requirements.txt
+        stage('Quality') {
+            steps {
+                script {
+                    dockerImage.inside {
+                        sh 'flake8 .'
+                    }
+                }
+            }
+        }
+
+        // unittest discovers and runs all tests automatically
+        // no pip install — unittest is part of Python's standard library
         stage('Test') {
             steps {
-                echo 'Stage 5: Running Tests...'
-                // We run tests INSIDE the Docker container to ensure the artifact works
-                sh "docker run --rm ${IMAGE_NAME}:latest pytest"
+                script {
+                    dockerImage.inside {
+                        sh 'python -m unittest discover -v'
+                    }
+                }
             }
         }
 
-        // 6. DEPLOY: Run the Container
-        stage('Deploy') {
+        stage('Push') {
+            when {
+                branch "${env.DEPLOY_BRANCH}"
+            }
             steps {
-                echo 'Stage 6: Deploying Application...'
-                // Stop old container if running, then run new one
-                sh """
-                    docker stop ${IMAGE_NAME}_running || true
-                    docker rm ${IMAGE_NAME}_running || true
-                    docker run -d --name ${IMAGE_NAME}_running ${IMAGE_NAME}:latest
-                """
+                script {
+                    docker.withRegistry(
+                        "https://${env.DOCKER_REGISTRY}",
+                        env.REGISTRY_CREDS
+                    ) {
+                        dockerImage.push("${env.IMAGE_TAG}")
+                        dockerImage.push('latest')
+                    }
+                }
             }
         }
-    }
 
-    post {
-        always {
-            echo 'Cleaning up workspace...'
-            // Remove the virtual env and the docker image to save space
-            sh "rm -rf ${VENV_NAME}"
-            sh "docker rmi ${IMAGE_NAME}:latest || true"
-        }
-        success {
-            echo 'Pipeline completed successfully!'
-        }
-        failure {
-            echo 'Pipeline failed. Please check logs.'
+        stage('Deploy') {
+            when {
+                branch "${env.DEPLOY_BRANCH}"
+            }
+            steps {
+                withCredentials([sshUserPrivateKey(
+                    credentialsId: env.DEPLOY_SSH_CREDS,
+                    keyFileVariable: 'SSH_KEY',
+                    usernameVariable: 'SSH_USER'
+                )]) {
+                    sh """
+                        ssh -i \$SSH_KEY \
+                            -o StrictHostKeyChecking=no \
+                            \$SSH_USER@${env.DEPLOY_HOST} \
+                            '
+                            docker pull ${env.DOCKER_IMAGE}:${env.IMAGE_TAG} &&
+                            docker stop ${env.CONTAINER_NAME} || true &&
+                            docker rm   ${env.CONTAINER_NAME} || true &&
+                            docker run -d \
+                                --name ${env.CONTAINER_NAME} \
+                                --restart unless-stopped \
+                                ${env.DOCKER_IMAGE}:${env.IMAGE_TAG}
+                            '
+                    """
+                }
+            }
+            // cleanup runs after deploy steps finish, whether they pass or fail
+            post {
+                always {
+                    script {
+                        sh "docker rmi ${env.DOCKER_IMAGE}:${env.IMAGE_TAG} || true"
+                    }
+                    cleanWs()
+                }
+                success {
+                    echo "App running on ${env.DEPLOY_HOST}:${env.APP_PORT}"
+                }
+                failure {
+                    echo "Pipeline failed at deploy. Check logs above."
+                }
+            }
         }
     }
 }
