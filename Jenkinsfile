@@ -98,11 +98,13 @@ pipeline {
                     usernameVariable: 'SSH_USER'
                 )]) {
                     sh """
-                        ssh -i \$SSH_KEY -o StrictHostKeyChecking=no \$SSH_USER@${env.DEPLOY_HOST} \
-                        "docker pull ${env.DOCKER_IMAGE}:${env.IMAGE_TAG} && \
-                        docker stop ${env.CONTAINER_NAME} || true ; \
-                        docker rm ${env.CONTAINER_NAME} || true ; \
-                        docker run -d \
+                        ssh -i \$SSH_KEY \
+                            -o StrictHostKeyChecking=no \
+                            \$SSH_USER@${env.DEPLOY_HOST} \
+                            "docker pull ${env.DOCKER_IMAGE}:${env.IMAGE_TAG} && \
+                            docker stop ${env.CONTAINER_NAME} || true ; \
+                            docker rm ${env.CONTAINER_NAME} || true ; \
+                            docker run -d \
                             --name ${env.CONTAINER_NAME} \
                             --restart unless-stopped \
                             ${env.DOCKER_IMAGE}:${env.IMAGE_TAG}"
@@ -117,7 +119,7 @@ pipeline {
                     cleanWs()
                 }
                 success {
-                    echo "App running on ${env.DEPLOY_HOST}:${env.APP_PORT}"
+                    echo "App running on ${env.DEPLOY_HOST}"
                 }
                 failure {
                     echo "Pipeline failed at deploy. Check logs above."
