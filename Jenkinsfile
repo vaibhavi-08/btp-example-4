@@ -98,6 +98,7 @@ pipeline {
                     usernameVariable: 'SSH_USER'
                 )]) {
                     sh """
+    echo "IMAGE=${env.DOCKER_IMAGE} TAG=${env.IMAGE_TAG} CONTAINER=${env.CONTAINER_NAME} HOST=${env.DEPLOY_HOST}"
     ssh -i \$SSH_KEY -o StrictHostKeyChecking=no \$SSH_USER@${env.DEPLOY_HOST} 'docker pull ${env.DOCKER_IMAGE}:${env.IMAGE_TAG} ; docker stop ${env.CONTAINER_NAME} || true ; docker rm ${env.CONTAINER_NAME} || true ; docker run -d --name ${env.CONTAINER_NAME} --restart unless-stopped ${env.DOCKER_IMAGE}:${env.IMAGE_TAG}'
 """
                 }
