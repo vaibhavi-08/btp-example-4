@@ -1,14 +1,11 @@
 pipeline {
     agent any
-
     environment {
         REGISTRY_CREDS   = 'dockerhub-credentials'
         DEPLOY_SSH_CREDS = 'deploy-server-ssh'
         DOCKER_REGISTRY  = 'registry-1.docker.io'
     }
-
     stages {
-
         stage('Checkout') {
             steps {
                 checkout scm
@@ -29,7 +26,6 @@ pipeline {
                 }
             }
         }
-
         stage('Build') {
             steps {
                 script {
@@ -39,9 +35,6 @@ pipeline {
                 }
             }
         }
-
-        // flake8 . checks entire repo from root
-        // no pip install — flake8 must be in requirements.txt
         stage('Quality') {
             steps {
                 script {
@@ -51,9 +44,6 @@ pipeline {
                 }
             }
         }
-
-        // unittest discovers and runs all tests automatically
-        // no pip install — unittest is part of Python's standard library
         stage('Test') {
             steps {
                 script {
@@ -63,7 +53,6 @@ pipeline {
                 }
             }
         }
-
         stage('Deploy') {
             when {
                 expression {
